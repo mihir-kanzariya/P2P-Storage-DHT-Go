@@ -33,7 +33,7 @@ type Peer struct {
 type PeerInfo struct {
 	PeerID      int
 	Port        string
-	Files       [50000]string
+	Files       [10]string
 	numFiles    int
 	isConnected bool
 }

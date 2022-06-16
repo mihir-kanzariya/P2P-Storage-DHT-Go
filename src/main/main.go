@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"FileShare/src/fileshare"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,15 @@ import (
 
 var m *fileshare.SwarmMaster
 var r *mux.Router
+var dataStoragePath = flag.String("ls", "", "local storage path")
+
+func main() {
+	
+	flag.Parse()
+	m = fileshare.MakeSwarmMaster()
+	m.MasterTest() // this isn't really needed - we can move the code to
+	setupRoutes()
+}
 
 func pingFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -24,7 +34,7 @@ func pingFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func createPeer(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("\nEndpoint Hit: CreatePeer")
+	fmt.Println("Endpoint Hit: CreatePeer")
 
 	reqBody, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -36,6 +46,7 @@ func createPeer(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(resBytes, &jsonRes)
 
 	var id int = int(jsonRes["id"].(float64))
+	fmt.Println("id", id)
 	testDirectory := "testdirs/peer" + strconv.Itoa(id)
 	const nodeIdPrefix = 60120
 	port := ":" + strconv.Itoa(nodeIdPrefix+id)
@@ -45,14 +56,12 @@ func createPeer(w http.ResponseWriter, r *http.Request) {
 	p1 := fileshare.MakePeer(id, testDirectory, port)
 	nodes := m.GetActiveNodes()
 	if len(nodes) > 0 {
+		fmt.Println("Available Nodes: ", nodes)
 		randomNodeId := rand.Int() % len(nodes)
 		fmt.Println("Node ", id, " will connect with ", nodes[randomNodeId])
 		p1.ConnectPeer(":"+strconv.Itoa(nodeIdPrefix+nodes[randomNodeId]), nodes[randomNodeId])
 	}
 	p1.ConnectServer()
-
-	destination := testDirectory + "/output.json"
-	fileshare.CopyManifest(destination)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(p1)
@@ -85,7 +94,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 
 	tempFile.Write(fileBytes)
 
-	fileshare.CreateChunksAndEncrypt(tempFile.Name(), m, handler.Filename, fileExtension)
+	fileshare.CreateChunksAndEncrypt(tempFile.Name(), m, handler.Filename, fileExtension,*dataStoragePath)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(`Successfully Uploaded File`)
@@ -111,12 +120,6 @@ func setupHeader(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 }
 
-func main() {
-	m = fileshare.MakeSwarmMaster()
-	m.MasterTest() // this isn't really needed - we can move the code to
-	setupRoutes()
-}
-
 func searchFile(w http.ResponseWriter, r *http.Request) {
 	filename := mux.Vars(r)["filename"]
 	ownername := r.URL.Query().Get("ownername")
@@ -132,12 +135,14 @@ func decryptFile(w http.ResponseWriter, r *http.Request) {
 
 	setupHeader(w)
 
+	fmt.Println("insideerererer decrypt ", filename, ownername)
 	fileExtension := fileshare.ConvertDecryptFiles(filename, ownername)
+	fmt.Println("insideerererer decrypt dasasas")
 
 	tempFileName := "final" + fileExtension
 	files := fileshare.ReadFile("./testdirs/" + tempFileName)
 	w.Write(files)
-	// os.Remove("./testdirs/" + tempFileName)
+	os.Remove("./testdirs/" + tempFileName)
 }
 
 func setupRoutes() {

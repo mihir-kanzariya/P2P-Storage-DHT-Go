@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -21,7 +20,6 @@ const (
 	dbPath            = "./database"
 	cryptoKey         = "teteteteteetesdsdsdsdsdt"
 	chunkFileSize int = 256 // bytes
-	BUFFERSIZE    int = 500
 )
 
 var Colors = fileExtentions()
@@ -49,24 +47,12 @@ func ReadDir(dirname string) []os.FileInfo {
 	return files
 }
 
-func ReadFile(filePath string) []byte {
-	file, err := os.Open(filePath)
+func ReadFile(file string) []byte {
+	data, err := ioutil.ReadFile(file)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatal(err)
 	}
-	defer file.Close()
-
-	fileinfo, err := file.Stat()
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-
-	filesize := fileinfo.Size()
-	buffer := make([]byte, filesize)
-
-	file.Read(buffer)
-	return buffer
+	return data
 }
 
 func GetEncryptedFiles(fileName string, ownername string) []File {
@@ -91,14 +77,6 @@ func GetEncryptedFiles(fileName string, ownername string) []File {
 func ConvertDecryptFiles(fileName string, ownername string) string {
 
 	chunks := GetEncryptedFiles(fileName, ownername)
-	sort.SliceStable(chunks, func(i, j int) bool {
-		return chunks[i].ChuckIndex < chunks[j].ChuckIndex
-	})
-	allFilePaths := make([]string, 0)
-	for _, elem := range chunks {
-		allFilePaths = append(allFilePaths, string(elem.FilePath))
-	}
-	allBufferData := RetrieveFilesFromChunk(allFilePaths)
 
 	tempfile := "./testdirs/" + "final" + chunks[0].FileExtension
 
@@ -107,18 +85,43 @@ func ConvertDecryptFiles(fileName string, ownername string) string {
 		log.Fatal(err)
 	}
 
-	file.Write(allBufferData)
-
+	for _, f := range chunks {
+		databyte := ReadFile(f.FilePath)
+		data := DecryptFile(string(databyte))
+		length, err := io.WriteString(file, data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("file length is ", length, data)
+	}
 	defer file.Close()
 	return chunks[0].FileExtension
 }
 
-func CreateChunksAndEncrypt(filepath string, m *SwarmMaster, name string, fileExtension string) {
+func CreateChunksAndEncrypt(filepath string, m *SwarmMaster, name string, fileExtension string, storagePath string) {
 
-	writefile(CreateFileChunks(filepath), filepath, m, name, fileExtension)
+	// allChunks := make([]string, 0)
+
+	// switch fileExtension {
+
+	// case fileExtentions().txt:
+	// 	allChunks = ReadTxt(filepath)
+
+	// case fileExtentions().pdf:
+	// 	allChunks = ReadPdf(filepath)
+
+	// case fileExtentions().docx:
+
+	// default:
+	// 	fmt.Println("Not supported File Type")
+	// }
+
+	// writefile(allChunks, filepath, m, name, fileExtension)
+//	path := "../main/testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/" + fileChunk
+	erasureEncoding(4,2,filepath,storagePath,name)
 }
 
-func writefile(data [][]byte, filePath string, m *SwarmMaster, name string, fileExtension string) {
+func writefile(data []string, filePath string, m *SwarmMaster, name string, fileExtension string) {
 
 	nodes := m.GetActiveNodes()
 
@@ -158,75 +161,9 @@ func writefile(data [][]byte, filePath string, m *SwarmMaster, name string, file
 			fmt.Println(err)
 		}
 		defer file.Close()
-		file.Write([]byte(EncryptFile(string(chunk))))
+		file.WriteString(EncryptFile(chunk))
 		counter++
 	}
-
-	// upload manifest file to all nodes
-	updateManifest(m)
-}
-
-func updateManifest(m *SwarmMaster) {
-	nodes := m.GetActiveNodes()
-	for _, b := range nodes {
-		destination := "testdirs/peer" + strconv.Itoa(b) + "/output.json"
-		CopyManifest(destination)
-	}
-}
-
-func CopyManifest(dst string) error {
-
-	src := "output.json"
-
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file.", src)
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	//remove file if already file exist
-	_, err = os.Stat(dst)
-	if err == nil {
-		err := os.Remove(dst)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	if err != nil {
-		panic(err)
-	}
-
-	buf := make([]byte, BUFFERSIZE)
-	for {
-		n, err := source.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			break
-		}
-
-		if _, err := destination.Write(buf[:n]); err != nil {
-			return err
-		}
-	}
-	return err
 }
 
 func SearchFiles(filename string, ownername string) []File {
@@ -268,7 +205,8 @@ func SaveFileInfo(chunk File) []File {
 
 	reqBodyBytes := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes).Encode(chunk)
-	// key := chunk.Chunkname
+	key := chunk.Chunkname
+	fmt.Println("key is ", key)
 
 	file, err := ioutil.ReadFile("output.json")
 	if err != nil {
