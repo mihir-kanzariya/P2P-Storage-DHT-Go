@@ -1,12 +1,12 @@
 package main
 
 import (
-	"flag"
-	"main/src/fileshare"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"main/src/fileshare"
 	"math/rand"
 	"net/http"
 	"os"
@@ -21,7 +21,7 @@ var r *mux.Router
 var dataStoragePath = flag.String("ls", "", "local storage path")
 
 func main() {
-	
+
 	flag.Parse()
 	m = fileshare.MakeSwarmMaster()
 	m.MasterTest() // this isn't really needed - we can move the code to
@@ -94,7 +94,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 
 	tempFile.Write(fileBytes)
 
-	fileshare.CreateChunksAndEncrypt(tempFile.Name(), m, handler.Filename, fileExtension,*dataStoragePath)
+	fileshare.CreateChunksAndEncrypt(tempFile.Name(), m, handler.Filename, fileExtension, *dataStoragePath)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(`Successfully Uploaded File`)

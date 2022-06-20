@@ -1,4 +1,4 @@
-package erasurecoding
+package fileshare
 
 import (
 	"fmt"
@@ -10,8 +10,7 @@ import (
 	"github.com/klauspost/reedsolomon"
 )
 
-
-func erasureEncoding(dataShards int,parShards int, inputFile string, outputFilePath string, outputFileName string){
+func erasureEncoding(dataShards int, parShards int, inputFile string, outputFilePath string, outputFileName string) {
 
 	if (dataShards + parShards) > 256 {
 		fmt.Fprintf(os.Stderr, "Error: sum of data and parity shards cannot exceed 256\n")
@@ -62,7 +61,7 @@ func erasureEncoding(dataShards int,parShards int, inputFile string, outputFileP
 		f, err := os.Open(out[i].Name())
 		checkErr(err)
 		input[i] = f
-	//	updateManifestFile()
+		//	updateManifestFile()
 		defer f.Close()
 	}
 
@@ -77,14 +76,11 @@ func erasureEncoding(dataShards int,parShards int, inputFile string, outputFileP
 	err = encodingStream.Encode(input, parity)
 	checkErr(err)
 	fmt.Printf("File split into %d data + %d parity shards.\n", dataShards, parShards)
-    
-
-
 
 }
 
 // func updateManifestFile(filePath string,nodeId string,fileName string,peerID string,fileHash []byte,fileIndex int){
-//         	var chunks File   
+//         	var chunks File
 // 			dir, file := filepath.Split(filePath)
 // 			fileExtension := filepath.Ext(filePath)
 // 			chunks.Chunkname = file
@@ -96,13 +92,11 @@ func erasureEncoding(dataShards int,parShards int, inputFile string, outputFileP
 // 			chunks.BlockHash = fileHash
 // 			chunks.ChuckIndex = fileIndex
 // 			chunks.Port = peerID
-	
+
 // 			SaveFileInfo(chunks)
 // }
 
-
-
-func getLocalStorage(path string,fileName string){
+func getLocalStorage(path string, fileName string) {
 
 	//return path.fileName
 }
@@ -113,4 +107,3 @@ func checkErr(err error) {
 		os.Exit(2)
 	}
 }
-

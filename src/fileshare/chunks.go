@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"main/src/fileshare/erasurecoding"
 
 	"github.com/dgraph-io/badger"
 	"github.com/google/uuid"
@@ -118,8 +117,8 @@ func CreateChunksAndEncrypt(filepath string, m *SwarmMaster, name string, fileEx
 	// }
 
 	// writefile(allChunks, filepath, m, name, fileExtension)
-//	path := "../main/testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/" + fileChunk
-//erasurecoding.erasureEncoding(4,2,filepath,storagePath,name)
+	//	path := "../main/testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/" + fileChunk
+	erasureEncoding(4, 2, filepath, storagePath, name)
 }
 
 func writefile(data []string, filePath string, m *SwarmMaster, name string, fileExtension string) {
@@ -189,18 +188,18 @@ type FileDB struct {
 	Database *badger.DB
 }
 
-func GetDBinstacnce() *FileDB {
-	opts := badger.DefaultOptions
-	opts.Dir = dbPath
-	opts.ValueDir = dbPath
+// func GetDBinstacnce() *FileDB {
+// 	opts := badger.DefaultOptions
+// 	opts.Dir = dbPath
+// 	opts.ValueDir = dbPath
 
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	blockchain := FileDB{Database: db}
-	return &blockchain
-}
+// 	db, err := badger.Open(opts)
+// 	if err != nil {
+// 		log.Fatal(err)
+// 	}
+// 	blockchain := FileDB{Database: db}
+// 	return &blockchain
+// }
 
 func SaveFileInfo(chunk File) []File {
 
