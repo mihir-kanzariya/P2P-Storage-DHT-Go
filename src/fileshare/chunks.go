@@ -118,7 +118,8 @@ func CreateChunksAndEncrypt(filepath string, m *SwarmMaster, name string, fileEx
 
 	// writefile(allChunks, filepath, m, name, fileExtension)
 	//	path := "../main/testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/" + fileChunk
-	erasureEncoding(4, 2, filepath, storagePath, name)
+
+	erasureEncoding(4, 2, filepath, storagePath, name, m)
 }
 
 func writefile(data []string, filePath string, m *SwarmMaster, name string, fileExtension string) {
@@ -155,7 +156,7 @@ func writefile(data []string, filePath string, m *SwarmMaster, name string, file
 		chunks.ChuckIndex = index
 		chunks.Port = registerPeers[counter].Port
 
-		SaveFileInfo(chunks)
+		SaveFileInfo(chunks, "")
 
 		if err != nil {
 			fmt.Println(err)
@@ -201,14 +202,14 @@ type FileDB struct {
 // 	return &blockchain
 // }
 
-func SaveFileInfo(chunk File) []File {
+func SaveFileInfo(chunk File, outputFilePath string) []File {
 
 	reqBodyBytes := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes).Encode(chunk)
 	key := chunk.Chunkname
 	fmt.Println("key is ", key)
 
-	file, err := ioutil.ReadFile("output.json")
+	file, err := ioutil.ReadFile(outputFilePath + "output.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -218,7 +219,7 @@ func SaveFileInfo(chunk File) []File {
 
 	reqBodyBytes2 := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes2).Encode(data)
-	ioutil.WriteFile("output.json", reqBodyBytes2.Bytes(), 0644)
+	ioutil.WriteFile(outputFilePath+"output.json", reqBodyBytes2.Bytes(), 0644)
 
 	return data
 }

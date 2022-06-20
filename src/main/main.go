@@ -63,6 +63,9 @@ func createPeer(w http.ResponseWriter, r *http.Request) {
 	}
 	p1.ConnectServer()
 
+	destination := testDirectory + "/output.json"
+	os.Create(destination)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(p1)
 }
@@ -92,7 +95,8 @@ func upload(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	tempFile.Write(fileBytes)
+	tempFile.Write([]byte(fileshare.EncryptFile(string(fileBytes))))
+	// tempFile.Write(fileBytes)
 
 	fileshare.CreateChunksAndEncrypt(tempFile.Name(), m, handler.Filename, fileExtension, *dataStoragePath)
 
