@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"main/src/fileshare/erasurecoding"
 
 	"github.com/dgraph-io/badger"
 	"github.com/google/uuid"
@@ -118,7 +119,7 @@ func CreateChunksAndEncrypt(filepath string, m *SwarmMaster, name string, fileEx
 
 	// writefile(allChunks, filepath, m, name, fileExtension)
 //	path := "../main/testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/" + fileChunk
-	erasureEncoding(4,2,filepath,storagePath,name)
+//erasurecoding.erasureEncoding(4,2,filepath,storagePath,name)
 }
 
 func writefile(data []string, filePath string, m *SwarmMaster, name string, fileExtension string) {

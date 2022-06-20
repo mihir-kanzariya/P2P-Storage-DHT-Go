@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"FileShare/src/fileshare"
+	"main/src/fileshare"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"

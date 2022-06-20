@@ -1,4 +1,4 @@
-package fileshare
+package erasurecoding
 
 import (
 	"fmt"
@@ -83,24 +83,24 @@ func erasureEncoding(dataShards int,parShards int, inputFile string, outputFileP
 
 }
 
-func updateManifestFile(filePath string,nodeId string,fileName string,peerID string,fileHash []byte,fileIndex int){
-        	var chunks File   
-			dir, file := filepath.Split(filePath)
-			fileExtension := filepath.Ext(filePath)
-			chunks.Chunkname = file
-			chunks.FilePath = dir
-			chunks.FileExtension = fileExtension
-			chunks.FileName = fileName
-			chunks.Ownername = "StorageTeam"
-			chunks.NodeAddress = peerID
-			chunks.BlockHash = fileHash
-			chunks.ChuckIndex = fileIndex
-			chunks.Port = peerID
+// func updateManifestFile(filePath string,nodeId string,fileName string,peerID string,fileHash []byte,fileIndex int){
+//         	var chunks File   
+// 			dir, file := filepath.Split(filePath)
+// 			fileExtension := filepath.Ext(filePath)
+// 			chunks.Chunkname = file
+// 			chunks.FilePath = dir
+// 			chunks.FileExtension = fileExtension
+// 			chunks.FileName = fileName
+// 			chunks.Ownername = "StorageTeam"
+// 			chunks.NodeAddress = peerID
+// 			chunks.BlockHash = fileHash
+// 			chunks.ChuckIndex = fileIndex
+// 			chunks.Port = peerID
 	
-			SaveFileInfo(chunks)
-}
+// 			SaveFileInfo(chunks)
+// }
 
-//func()
+
 
 func getLocalStorage(path string,fileName string){
 
