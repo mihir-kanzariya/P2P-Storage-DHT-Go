@@ -49,7 +49,7 @@ func erasureEncoding(dataShards int, parShards int, inputFile string, outputFile
 
 		outputFilePath = "testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/"
 		out[i], err = os.Create(filepath.Join(outputFilePath, outfn))
-		updateManifestFile(outputFilePath+outfn, outfn, registerPeers[counter].Port, i, outputFilePath)
+		updateManifestFile(outputFilePath+outfn, outfn, registerPeers[counter].Port, i, outputFilePath, filepath.Ext(inputFile))
 		counter++
 		checkErr(err)
 	}
@@ -88,12 +88,11 @@ func erasureEncoding(dataShards int, parShards int, inputFile string, outputFile
 
 }
 
-func updateManifestFile(filePath string, fileName string, peerID string, fileIndex int, outputFilePath string) {
+func updateManifestFile(filePath string, fileName string, peerID string, fileIndex int, outputFilePath string, fileExtension string) {
 	var chunks File
 	dir, file := filepath.Split(filePath)
-	fileExtension := filepath.Ext(filePath)
 	chunks.Chunkname = file
-	chunks.FilePath = dir
+	chunks.FilePath = dir + fileName
 	chunks.FileExtension = fileExtension
 	chunks.FileName = fileName
 	chunks.Ownername = "StorageTeam"

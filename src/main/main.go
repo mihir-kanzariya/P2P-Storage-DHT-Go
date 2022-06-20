@@ -140,12 +140,13 @@ func decryptFile(w http.ResponseWriter, r *http.Request) {
 	setupHeader(w)
 
 	fmt.Println("insideerererer decrypt ", filename, ownername)
-	fileExtension := fileshare.ConvertDecryptFiles(filename, ownername)
+	fileExtension := fileshare.ConvertDecryptFilesV2(filename, ownername, m)
 	fmt.Println("insideerererer decrypt dasasas")
 
 	tempFileName := "final" + fileExtension
 	files := fileshare.ReadFile("./testdirs/" + tempFileName)
-	w.Write(files)
+	w.Header().Set("Content-Disposition", "attachment; filename=finalResponse"+fileExtension)
+	w.Write([]byte(fileshare.DecryptFile(string(files))))
 	os.Remove("./testdirs/" + tempFileName)
 }
 

@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -74,6 +75,35 @@ func GetEncryptedFiles(fileName string, ownername string) []File {
 	return chunks
 }
 
+func GetEncryptedFilesV2(fileName string, ownername string, m *SwarmMaster) []File {
+
+	var chunks []File
+	nodes := m.GetActiveNodes()
+	fmt.Println("nodes: ===> ", nodes)
+
+	counter := 0
+	for i := 0; i < len(nodes); i++ {
+		filePath := "testdirs/peer" + strconv.Itoa(registerPeers[counter].PeerID) + "/output.json"
+		fmt.Println("i: ", i, filePath)
+
+		file, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			log.Fatal("here is the error: ", err)
+		}
+		fmt.Println("file: ", file)
+		var data []File
+		err = json.Unmarshal(file, &data)
+		for _, c := range data {
+			if string(c.Ownername) == ownername && strings.HasPrefix(c.FileName, fileName) {
+				chunks = append(chunks, c)
+			}
+		}
+		counter++
+	}
+	fmt.Println("\nTotal chunks found", len(chunks))
+	return chunks
+}
+
 func ConvertDecryptFiles(fileName string, ownername string) string {
 
 	chunks := GetEncryptedFiles(fileName, ownername)
@@ -94,6 +124,26 @@ func ConvertDecryptFiles(fileName string, ownername string) string {
 		}
 		fmt.Println("file length is ", length, data)
 	}
+	defer file.Close()
+	return chunks[0].FileExtension
+}
+
+func ConvertDecryptFilesV2(fileName string, ownername string, m *SwarmMaster) string {
+
+	chunks := GetEncryptedFilesV2(fileName, ownername, m)
+
+	tempfile := "./testdirs/" + "final" + chunks[0].FileExtension
+
+	file, err := os.Create(tempfile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sort.SliceStable(chunks, func(i, j int) bool {
+		return chunks[i].ChuckIndex < chunks[j].ChuckIndex
+	})
+	fmt.Println("\n\nChunks done", chunks)
+	erasureDecoding(4, 2, chunks, tempfile)
 	defer file.Close()
 	return chunks[0].FileExtension
 }
