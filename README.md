@@ -41,9 +41,3 @@ curl --location --request POST 'localhost:5001/upload' \
 ```
 curl --location --request GET 'localhost:5001/searchFile/demo.txt?ownername=StorageTeam'
 ```
-
-### Decrypt File
-PS. Sometime you will receive not readable data in postman while testing, so try to save that response with extension you want to try and check the result
-```
-curl --location --request GET 'localhost:5001/decryptFile/helloWorld?ownername=StorageTeam'
-```

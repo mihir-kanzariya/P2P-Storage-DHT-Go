@@ -7,3 +7,4 @@ src/main/testdirs/**
 src/main/database/**
 output.json
 .DS_Store**
+testdirs/**
