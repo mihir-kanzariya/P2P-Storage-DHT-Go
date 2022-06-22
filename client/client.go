@@ -158,7 +158,7 @@ func askForSuccesor(id int, peerAddr string) string {
 	defer conn.Close()
 	// Send the successor request.
 	succRequest := fmt.Sprintf("SUCC %d\n", id)
-	🚀 ~ file: client.go ~ line 162 ~ funcaskForSuccesor ~ succRequest", succRequest)
+	// 🚀 ~ file: client.go ~ line 162 ~ funcaskForSuccesor ~ succRequest", succRequest)
 	conn.Write([]byte(succRequest))
 	// Wait for an answer.
 	answer, err := reader.ReadString('\n')
