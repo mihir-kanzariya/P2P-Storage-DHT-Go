@@ -131,7 +131,6 @@ func GetOutboundIP() string {
 	}
 	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	fmt.Println("local ip is ", localAddr.IP)
 	str := convert(localAddr.IP)
 	return str
 }
@@ -412,17 +411,15 @@ func handleSuccessorRequest(conn net.Conn, reader *bufio.Reader, request string)
 	conn.Write([]byte(answer + "\n"))
 }
 
-func GetManifest() map[string]int {
+func GetManifest(dst int) map[string]int {
 
-	file, err := ioutil.ReadFile("output.json")
+	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
 	if err != nil {
-		log.Fatal(err)
+		// log.Fatal(err)
 	}
-	fmt.Println("Here", string(file))
 
 	var data map[string]int
 	err = json.Unmarshal(file, &data)
-	fmt.Println("Here", data)
 
 	return data
 }
@@ -432,7 +429,7 @@ func GetManifest() map[string]int {
 func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 	// Acquire the list of files that need to be transferred to the new node.
 	toTransfer := []string{}
-	for fileName, fileKey := range GetManifest() {
+	for fileName, fileKey := range GetManifest(self.ID) {
 		if between(newNodeID, fileKey, self.ID) {
 			continue
 		}
@@ -443,7 +440,7 @@ func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 		storeFile(fileName, newNodeAddr)
 		// Remove the file from this peer.
 		os.Remove(filePath(fileName))
-		deleteKey(fileName)
+		deleteKey(fileName, self.ID)
 		delete(storedFiles, fileName)
 	}
 }
@@ -557,9 +554,9 @@ func joinRing(initiatorAddress string) {
 	predecessor.ID = hsh(predecessorAddr)
 }
 
-func deleteKey(key string) {
+func deleteKey(key string, dst int) {
 
-	file, err := ioutil.ReadFile("output.json")
+	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -574,7 +571,7 @@ func deleteKey(key string) {
 
 		log.Fatal(errk)
 	}
-	ioutil.WriteFile("output.json", newData, 0644)
+	ioutil.WriteFile(fmt.Sprint(dst)+"/output.json", newData, 0644)
 }
 
 func leaveRing() {
@@ -587,7 +584,7 @@ func leaveRing() {
 	// Update this node's predecessor's successor.
 	sendUpdateRequest(successor.Address, "KEEP", predecessor.Address)
 	// Transfer the files to the successor.
-	for fileName := range GetManifest() {
+	for fileName := range GetManifest(self.ID) {
 		storeFile(fileName, successor.Address)
 	}
 	// Remove the peer directory.
@@ -645,11 +642,11 @@ func main() {
 			// Output the neighbor and self ids.
 			fmt.Printf("(%d, %d, %d)\n", predecessor.ID, self.ID, successor.ID)
 		case 5:
-			if len(GetManifest()) < 1 {
+			if len(GetManifest(self.ID)) < 1 {
 				fmt.Println("No files are stored!")
 			}
 			// Iterate through the storedFiles map and show each key, value pair.
-			for fileName, key := range GetManifest() {
+			for fileName, key := range GetManifest(self.ID) {
 				fmt.Println(fileName, "=>", key)
 			}
 		case 6:
