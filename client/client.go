@@ -2,12 +2,17 @@ package main
 
 import (
 	"bufio"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"log"
+	rann "math/rand"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -95,14 +100,6 @@ func storeFile(fileName string, peerAddr string) {
 	}
 	// Response: OK
 	io.Copy(conn, srcFile)
-	// Read the next response.
-	serverResponse, _ = reader.ReadString('\n')
-	respType, respMsg = extractServerResponse(serverResponse)
-	// Response: ERR <error msg>
-	if respType != "OK" {
-		fmt.Println("> Server response:", respMsg)
-		return
-	}
 	// Response: OK
 	fmt.Println("File successfully stored.")
 }
@@ -154,11 +151,9 @@ func retrieveFile(fileName string, peerAddr string) {
 func askForSuccesor(id int, peerAddr string) string {
 	// Initiate a connection with the given peer address.
 	conn, reader := connectToPeer(peerAddr)
-	// console.log("🚀 ~ file: client.go ~ line 159 ~ funcaskForSuccesor ~ reader", reader)
 	defer conn.Close()
 	// Send the successor request.
 	succRequest := fmt.Sprintf("SUCC %d\n", id)
-	// 🚀 ~ file: client.go ~ line 162 ~ funcaskForSuccesor ~ succRequest", succRequest)
 	conn.Write([]byte(succRequest))
 	// Wait for an answer.
 	answer, err := reader.ReadString('\n')
@@ -170,6 +165,23 @@ func askForSuccesor(id int, peerAddr string) string {
 	return answer
 }
 
+func saveFile(fileName string, peerAddr string) {
+
+	chunks := CreateFileChunks(fileName)
+
+	for index, chunk := range chunks {
+
+		fileExtension := filepath.Ext(fileName)
+		name := "chunk-" + strconv.Itoa(rann.Int()) + strconv.Itoa(index) + fileExtension
+		tempFile, err := os.Create(name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		tempFile.Write([]byte(EncryptFile(string(chunk))))
+		storeFile(tempFile.Name(), peerAddr)
+		os.Remove(name)
+	}
+}
 func main() {
 	storeIP := os.Args[1]
 	storePort := os.Args[2]
@@ -194,7 +206,8 @@ func main() {
 			var fileName string
 			fmt.Scanln(&fileName)
 			start := time.Now()
-			storeFile(fileName, storeAddr)
+			saveFile(fileName, storeAddr)
+			// storeFile(fileName, storeAddr)
 			elapsed := time.Since(start)
 			fmt.Println("Transfer took", elapsed.Microseconds(), "us")
 		case 2:
@@ -211,4 +224,108 @@ func main() {
 			return
 		}
 	}
+}
+
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+//------------------------------------------------ CREATING CHUNKS------------------------------------------//
+
+func CreateFileChunks(pathName string) [][]byte {
+	file, err := os.Open(pathName)
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	defer file.Close()
+
+	fileinfo, err := file.Stat()
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+
+	filesize := fileinfo.Size()
+	buffer := make([]byte, filesize)
+
+	file.Read(buffer)
+
+	divided := chunks(buffer, 60)
+	fmt.Println("Total ", len(divided), " chunks created")
+	return divided
+}
+
+func chunks(xs []byte, chunkSize int) [][]byte {
+	if len(xs) == 0 {
+		return nil
+	}
+	divided := make([][]byte, (len(xs)+chunkSize-1)/chunkSize)
+	prev := 0
+	i := 0
+	till := len(xs) - chunkSize
+	for prev < till {
+		next := prev + chunkSize
+		divided[i] = xs[prev:next]
+		prev = next
+		i++
+	}
+	divided[i] = xs[prev:]
+	return divided
+}
+
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION ------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+//------------------------------------------------ CREATING ENCRYPTIONS AND DECRYPTION------------------------------------------//
+
+const (
+	cryptoKey = "teteteteteetesdsdsdsdsdt"
+)
+
+func DecryptFile(cipherstring string) string {
+
+	keystring := cryptoKey
+	ciphertext := []byte(cipherstring)
+	key := []byte(keystring)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	if len(ciphertext) < aes.BlockSize {
+		panic("Text is too short")
+	}
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+	stream := cipher.NewCFBDecrypter(block, iv)
+	stream.XORKeyStream(ciphertext, ciphertext)
+	return string(ciphertext)
+}
+
+func EncryptFile(plainstring string) string {
+
+	keystring := cryptoKey
+	plaintext := []byte(plainstring)
+	key := []byte(keystring)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
+	}
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		panic(err)
+	}
+	stream := cipher.NewCFBEncrypter(block, iv)
+
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+	return string(ciphertext)
 }
