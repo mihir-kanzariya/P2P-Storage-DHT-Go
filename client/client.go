@@ -115,7 +115,7 @@ func retrieveFile(fileName string, peerAddr string) {
 	conn, reader := connectToPeer(succAddr)
 	defer conn.Close()
 	// Construct the request.
-	retrieveRequest := fmt.Sprintf("RETRIEVE %s\n", fileName)
+	retrieveRequest := fmt.Sprintf("RETRIEVE %s %s\n", fileName, succAddr)
 	// Send the retrieve request.
 	conn.Write([]byte(retrieveRequest))
 	// Retrieve the size of the file from the connection.

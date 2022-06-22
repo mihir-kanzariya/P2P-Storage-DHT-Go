@@ -54,8 +54,8 @@ var predecessor = newNode()
 // 	storedFiles int
 // }
 
-func GetStoredFile(key string) (string, int) {
-	file, err := ioutil.ReadFile("output.json")
+func GetStoredFile(dst int, key string) (string, int) {
+	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
 	if err != nil {
 		fmt.Print("Err", err)
 		log.Fatal(err)
@@ -65,28 +65,34 @@ func GetStoredFile(key string) (string, int) {
 	errj := json.Unmarshal(file, &m)
 	if errj != nil {
 		fmt.Print("Creating json file")
-
-		// log.Fatal(errj)
 	}
 
 	return key, m[key]
 
 }
 
-func SaveFileInfo(key string, value int) {
+func SaveFileInfo(dst int, key string, value int) {
 
-	file, err := ioutil.ReadFile("output.json")
+	manifest := fmt.Sprint(dst)
+
+	_, err := os.Stat(manifest)
 	if err != nil {
-		fmt.Print("Err", err)
-		log.Fatal(err)
+		err = os.Mkdir(manifest, 0755)
+		if err != nil {
+			fmt.Println("Error in creating dir")
+			// return nil, err
+		}
 	}
+
+	file, _ := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
+	// if err != nil {
+	// 	fmt.Print(" ", err)
+	// }
 
 	m := make(map[string]int)
 	errj := json.Unmarshal(file, &m)
 	if errj != nil {
 		fmt.Print("Errj", errj)
-
-		// log.Fatal(errj)
 	}
 
 	m[key] = value
@@ -96,7 +102,7 @@ func SaveFileInfo(key string, value int) {
 
 		log.Fatal(errk)
 	}
-	ioutil.WriteFile("output.json", newData, 0644)
+	ioutil.WriteFile(fmt.Sprint(dst)+"/output.json", newData, 0644)
 }
 
 // The map of stored files' names to their keys.
@@ -247,9 +253,8 @@ func handleRequest(conn net.Conn) {
 func handleRetrieveRequest(conn net.Conn, reader *bufio.Reader, request string) {
 	tokens := strings.Split(request, " ")
 	fileName := tokens[1]
-	fmt.Println("storedFiles", storedFiles)
-
-	_, ok1 := GetStoredFile(fileName)
+	add := tokens[2]
+	_, ok1 := GetStoredFile(hsh(add), fileName)
 
 	// _, ok := storedFiles[fileName]
 
@@ -304,7 +309,7 @@ func handleStoreRequest(conn net.Conn, reader *bufio.Reader, request string) {
 	}
 	fileKey := hsh(fileName)
 	storedFiles[fileName] = fileKey // memory store
-	SaveFileInfo(fileName, fileKey)
+	SaveFileInfo(self.ID, fileName, fileKey)
 
 	conn.Write([]byte("OK\n"))
 }
@@ -407,12 +412,27 @@ func handleSuccessorRequest(conn net.Conn, reader *bufio.Reader, request string)
 	conn.Write([]byte(answer + "\n"))
 }
 
+func GetManifest() map[string]int {
+
+	file, err := ioutil.ReadFile("output.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Here", string(file))
+
+	var data map[string]int
+	err = json.Unmarshal(file, &data)
+	fmt.Println("Here", data)
+
+	return data
+}
+
 // Checks through the files that are owned by this node and for the files
 // that should be moved to the new node, moves them.
 func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 	// Acquire the list of files that need to be transferred to the new node.
 	toTransfer := []string{}
-	for fileName, fileKey := range storedFiles {
+	for fileName, fileKey := range GetManifest() {
 		if between(newNodeID, fileKey, self.ID) {
 			continue
 		}
@@ -423,6 +443,7 @@ func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 		storeFile(fileName, newNodeAddr)
 		// Remove the file from this peer.
 		os.Remove(filePath(fileName))
+		deleteKey(fileName)
 		delete(storedFiles, fileName)
 	}
 }
@@ -536,6 +557,26 @@ func joinRing(initiatorAddress string) {
 	predecessor.ID = hsh(predecessorAddr)
 }
 
+func deleteKey(key string) {
+
+	file, err := ioutil.ReadFile("output.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var data map[string]int
+	err = json.Unmarshal(file, &data)
+
+	delete(data, key)
+	newData, errk := json.Marshal(data)
+	if errk != nil {
+		fmt.Print("Errk", errk)
+
+		log.Fatal(errk)
+	}
+	ioutil.WriteFile("output.json", newData, 0644)
+}
+
 func leaveRing() {
 	// You can't leave a ring if there's no ring!
 	if successor.ID == -1 || predecessor.ID == -1 {
@@ -546,7 +587,7 @@ func leaveRing() {
 	// Update this node's predecessor's successor.
 	sendUpdateRequest(successor.Address, "KEEP", predecessor.Address)
 	// Transfer the files to the successor.
-	for fileName := range storedFiles {
+	for fileName := range GetManifest() {
 		storeFile(fileName, successor.Address)
 	}
 	// Remove the peer directory.
@@ -604,11 +645,11 @@ func main() {
 			// Output the neighbor and self ids.
 			fmt.Printf("(%d, %d, %d)\n", predecessor.ID, self.ID, successor.ID)
 		case 5:
-			if len(storedFiles) < 1 {
+			if len(GetManifest()) < 1 {
 				fmt.Println("No files are stored!")
 			}
 			// Iterate through the storedFiles map and show each key, value pair.
-			for fileName, key := range storedFiles {
+			for fileName, key := range GetManifest() {
 				fmt.Println(fileName, "=>", key)
 			}
 		case 6:
