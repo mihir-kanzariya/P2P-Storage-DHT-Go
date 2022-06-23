@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type node struct {
@@ -31,11 +32,6 @@ func newNode() node {
 		Address: "",
 		ID:      -1,
 	}
-}
-
-// range specification, note that min <= max
-type IntRange struct {
-	min, max int
 }
 
 type Info struct {
@@ -327,10 +323,6 @@ func handleRetrieveRequest(conn net.Conn, reader *bufio.Reader, request string) 
 	conn.Write([]byte("OK\n"))
 }
 
-// get next random value within the interval including min and max
-func (ir *IntRange) NextRandom(r *rann.Rand) int {
-	return r.Intn(ir.max-ir.min+1) + ir.min
-}
 func getNodeId(index int) int {
 	id := self.ID
 	if index == 0 {
@@ -345,9 +337,14 @@ func getNodeId(index int) int {
 		}
 	} else {
 		if successor.ID != -1 && predecessor.ID != -1 {
-			r := rann.New(rann.NewSource(100))
-			ir := IntRange{1, 3} // because its ring based and 3 nodes would be here
-			return ir.NextRandom(r)
+			rann.Seed(time.Now().Unix())
+			nodes := []int{
+				self.ID,
+				successor.ID,
+				predecessor.ID,
+			}
+			n := rann.Int() % len(nodes)
+			return nodes[n]
 		}
 	}
 	return id
@@ -765,6 +762,7 @@ func main() {
 			// Output the neighbor and self ids.
 			fmt.Printf("(%d, %d, %d)\n", predecessor.ID, self.ID, successor.ID)
 		case 5:
+
 			// if len(GetFileChunks(self.ID)) < 1 {
 			// 	fmt.Println("No files are stored!")
 			// }
