@@ -16,6 +16,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +43,17 @@ type Info struct {
 	ChunkIndex  int    `json:"ChunkIndex"`
 	OwnerNodeId int    `json:"OwnerNodeId"`
 }
+
+type NodeInfo struct {
+	Units      string `json:"Units"`
+	TotalSpace uint64 `json:"TotalSpace"`
+	FreeSpace  uint64 `json:"FreeSpace"`
+	RAM        uint64 `json:"RAM"`
+	NoOfCpus   int    `json:"NoOfCpus"`
+	NodeId     int    `json:"NodeId"`
+	// NodeAddress   int    `json:"OwnerNodeId"`
+	NumberOfFiles int `json:"NumberOfFiles"`
+}
 type ChunkInfo struct {
 	ChunkName  string `json:"ChunkName"`
 	ChunkIndex int    `json:"ChunkIndex"`
@@ -49,6 +61,7 @@ type ChunkInfo struct {
 
 const (
 	ManifestPath = "output.json"
+	NodeInfoPath = "nodeinfo.json"
 )
 
 var mainMenu = `
@@ -56,6 +69,7 @@ var mainMenu = `
 2) Enter the key to find its successor
 3) Enter the filename to take its hash
 4) Display pred-id, my-id, and succ-id
+5) Display the nodeInfo (CPUs,Space, NumberofFiles etc) 
 6) Display my address
 7) Exit`
 
@@ -87,7 +101,120 @@ func isChunkExist(key string) bool {
 
 }
 
-/*.  Manifest Functions  */
+func GetStorageInfo() (string, uint64, uint64, uint64, int) {
+	// TODO: Dynamic values
+	// ama, err := disk.Usage("/")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	return "Bytes", 66666666666, 444444, 444444, 44
+}
+
+/*  */
+/* ======================================================  START: NodeInfo Functions  ====================================================== */
+
+func CheckNodeInfoExists() bool {
+	nodeinfo := fmt.Sprint(NodeInfoPath)
+
+	_, err := os.Stat(nodeinfo)
+	if err != nil {
+		myfile, e := os.Create(nodeinfo)
+		if e != nil {
+			return false
+		}
+		myfile.Close()
+	}
+	return true
+}
+
+func insertNodeinfo(Units string, TotalSpace uint64, FreeSpace uint64, RAM uint64, NoOfCpus int, NodeId int, NumberOfFiles int) {
+	if !CheckManifestExists() {
+		return
+	}
+	var nodeinfo = NodeInfo{
+		Units:         Units,
+		TotalSpace:    TotalSpace,
+		FreeSpace:     FreeSpace,
+		RAM:           RAM,
+		NoOfCpus:      NoOfCpus,
+		NodeId:        NodeId,
+		NumberOfFiles: NumberOfFiles,
+	}
+
+	reqBodyBytes := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes).Encode(nodeinfo)
+
+	file, err := ioutil.ReadFile(NodeInfoPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var data []NodeInfo
+	err = json.Unmarshal(file, &data)
+	data = append(data, nodeinfo)
+
+	reqBodyBytes2 := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes2).Encode(data)
+	ioutil.WriteFile(NodeInfoPath, reqBodyBytes2.Bytes(), 0644)
+}
+
+func GetNodeInfo() []NodeInfo {
+	if !CheckManifestExists() {
+		return nil
+	}
+	jsonFile, err := os.Open(NodeInfoPath)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	var nodeInfo []NodeInfo
+	json.Unmarshal(byteValue, &nodeInfo)
+	return nodeInfo
+}
+
+func GetNodeInfoByNodeId(nodeId int) NodeInfo {
+	if !CheckNodeInfoExists() {
+		return NodeInfo{}
+	}
+	var nodeInfo = GetNodeInfo()
+	var nodeDiskInfo NodeInfo
+
+	for i := 0; i < len(nodeInfo); i++ {
+		data := nodeInfo[i]
+		if data.NodeId == nodeId {
+			nodeDiskInfo = data
+		}
+	}
+	return nodeDiskInfo
+}
+
+func updateIt(nodeId int, ssSlice []NodeInfo) []NodeInfo {
+	var index int
+	for idx, v := range ssSlice {
+		if v.NodeId == nodeId {
+			index = idx
+		}
+	}
+	ssSlice[index].NumberOfFiles = ssSlice[index].NumberOfFiles + 1
+	return ssSlice
+}
+
+func updateNodeByNodeId(key int) {
+	if !CheckNodeInfoExists() {
+		return
+	}
+	var nodeInfo = GetNodeInfo()
+
+	data := updateIt(key, nodeInfo)
+
+	reqBodyBytes2 := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes2).Encode(data)
+	ioutil.WriteFile(NodeInfoPath, reqBodyBytes2.Bytes(), 0644)
+}
+
+/* ======================================================  START: Manifest Functions  ====================================================== */
 
 func CheckManifestExists() bool {
 	manifest := fmt.Sprint(ManifestPath)
@@ -126,6 +253,41 @@ func insertData(chunkIndex int, filename string, chunkName string, fileKey int, 
 
 }
 
+func GetMenifest() []Info {
+	if !CheckManifestExists() {
+		return nil
+	}
+	jsonFile, err := os.Open(ManifestPath)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	var nodeInfo []Info
+	json.Unmarshal(byteValue, &nodeInfo)
+	return nodeInfo
+}
+
+func GetFileChunks(filename string, ownerNodeId int) map[string]int {
+	if !CheckManifestExists() {
+		return nil
+	}
+	var nodeInfo = GetMenifest()
+	chunkInfo := make(map[string]int, 0)
+
+	for i := 0; i < len(nodeInfo); i++ {
+		data := nodeInfo[i]
+		if data.Filename == filename {
+			chunkInfo[data.ChunkName] = data.FileKey
+		}
+	}
+	fmt.Println("chunkInfo are ", chunkInfo)
+
+	return chunkInfo
+}
+
 func removeIt(ss string, ssSlice []Info) []Info {
 	for idx, v := range ssSlice {
 		if v.ChunkName == ss {
@@ -149,6 +311,7 @@ func deleteKey(key string) {
 	ioutil.WriteFile(ManifestPath, reqBodyBytes2.Bytes(), 0644)
 }
 
+/* ======================================================  END: Manifest Functions  ====================================================== */
 // Finds the IP (v4) of this peer.
 // Taken from https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
 func getSelfIP() string {
@@ -257,6 +420,16 @@ func serverRunner(port string) {
 	self.ID = hsh(self.Address)
 	folder := fmt.Sprintf("%d", self.ID)
 	os.Mkdir(folder, 0777)
+
+	myfile, e := os.Create("nodeinfo.json")
+	if e != nil {
+		// return false
+	}
+	myfile.Close()
+	GetStorageInfo()
+	Unit, TotalSpace, FreeSpace, RAM, No_Of_CPUs := GetStorageInfo()
+	insertNodeinfo(Unit, TotalSpace, FreeSpace, RAM, No_Of_CPUs, self.ID, 0)
+
 	for {
 		// Wait for a connection.
 		conn, err := ls.Accept()
@@ -396,6 +569,7 @@ func handleStoreRequest(conn net.Conn, reader *bufio.Reader, request string) {
 	}
 	os.Remove(dstFile.Name())
 
+	updateNodeByNodeId(self.ID)
 	conn.Write([]byte("OK\n"))
 }
 
@@ -534,56 +708,6 @@ func handleSuccessorRequest(conn net.Conn, reader *bufio.Reader, request string)
 	answer := findSuccessor(id)
 	// Send back the successor.
 	conn.Write([]byte(answer + "\n"))
-}
-
-func GetMenifest() []Info {
-	if !CheckManifestExists() {
-		return nil
-	}
-	jsonFile, err := os.Open(ManifestPath)
-
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	var nodeInfo []Info
-	json.Unmarshal(byteValue, &nodeInfo)
-	return nodeInfo
-}
-
-func GetFileChunks(filename string, ownerNodeId int) map[string]int {
-	if !CheckManifestExists() {
-		return nil
-	}
-	var nodeInfo = GetMenifest()
-	chunkInfo := make(map[string]int, 0)
-
-	for i := 0; i < len(nodeInfo); i++ {
-		data := nodeInfo[i]
-		if data.Filename == filename {
-			// data := ChunkInfo{ChunkName: data.ChunkName, ChunkIndex: data.ChunkIndex}
-			chunkInfo[data.ChunkName] = data.FileKey
-			// chunkInfo = append(chunkInfo, data)
-		}
-	}
-	fmt.Println("chunkInfo are ", chunkInfo)
-
-	return chunkInfo
-}
-
-func GetManifest(dst int) map[string]int {
-
-	file, err := ioutil.ReadFile(ManifestPath)
-	if err != nil {
-		// log.Fatal(err)
-	}
-
-	var data map[string]int
-	err = json.Unmarshal(file, &data)
-
-	return data
 }
 
 // Checks through the files that are owned by this node and for the files
@@ -839,14 +963,20 @@ func main() {
 			// Output the neighbor and self ids.
 			fmt.Printf("(%d, %d, %d)\n", predecessor.ID, self.ID, successor.ID)
 		case 5:
+			nodeDiskInfo := GetNodeInfoByNodeId(self.ID)
 
-			// if len(GetFileChunks(self.ID)) < 1 {
-			// 	fmt.Println("No files are stored!")
-			// }
-			// // Iterate through the storedFiles map and show each key, value pair.
-			// for fileName, key := range GetFileChunks(self.ID) {
-			// 	fmt.Println(fileName, "=>", key)
-			// }
+			if nodeDiskInfo.NodeId == 0 {
+				fmt.Println("No files are stored!")
+			}
+			v := reflect.ValueOf(nodeDiskInfo)
+			// v := reflect.ValueOf(s)
+			typeOfS := v.Type()
+			fmt.Println("=======================")
+
+			for i := 0; i < v.NumField(); i++ {
+				fmt.Printf("%s => %v\n", typeOfS.Field(i).Name, v.Field(i).Interface())
+			}
+			fmt.Println("=======================")
 		case 6:
 			fmt.Println(self.Address)
 		case 7:
