@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
@@ -29,6 +30,23 @@ func newNode() node {
 	}
 }
 
+type Info struct {
+	Filename    string `json:"Filename"`
+	ChunkName   string `json:"ChunkName"`
+	FileKey     int    `json:"FileKey"`
+	NoOfChunks  int    `json:"NoOfChunks"`
+	ChunkIndex  int    `json:"ChunkIndex"`
+	OwnerNodeId int    `json:"OwnerNodeId"`
+}
+type ChunkInfo struct {
+	ChunkName  string `json:"ChunkName"`
+	ChunkIndex int    `json:"ChunkIndex"`
+}
+
+const (
+	ManifestPath = "output.json"
+)
+
 var mainMenu = `
 1) Enter the peer address to connect
 2) Enter the key to find its successor
@@ -53,9 +71,23 @@ var predecessor = newNode()
 // type File struct {
 // 	storedFiles int
 // }
+func isChunkExist(key string) bool {
+	if !CheckManifestExists() {
+		return false
+	}
+	var nodeInfo = GetMenifest()
+
+	for _, data := range nodeInfo {
+		if data.ChunkName == key {
+			return true
+		}
+	}
+	return false
+
+}
 
 func GetStoredFile(dst int, key string) (string, int) {
-	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
+	file, err := ioutil.ReadFile(ManifestPath)
 	if err != nil {
 		fmt.Print("Err", err)
 		log.Fatal(err)
@@ -71,20 +103,97 @@ func GetStoredFile(dst int, key string) (string, int) {
 
 }
 
+/*.  Manifest Functions  */
+
+func CheckManifestExists() bool {
+	manifest := fmt.Sprint(ManifestPath)
+
+	_, err := os.Stat(manifest)
+	if err != nil {
+		myfile, e := os.Create(manifest)
+		if e != nil {
+			return false
+		}
+		// log.Println(myfile)
+		myfile.Close()
+
+		// err = os.Mkdir(manifest, 0755)
+		// if err != nil {
+		// 	return false
+		// }
+	}
+	return true
+}
+
+func insertData(chunkIndex int, filename string, chunkName string, fileKey int, noOfChunks int, ownerNodeId int) {
+	fmt.Println("here")
+	if !CheckManifestExists() {
+		return
+	}
+	var info = Info{Filename: filename, ChunkIndex: chunkIndex, ChunkName: chunkName, FileKey: fileKey, NoOfChunks: noOfChunks, OwnerNodeId: ownerNodeId}
+
+	reqBodyBytes := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes).Encode(info)
+
+	file, err := ioutil.ReadFile(ManifestPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var data []Info
+	err = json.Unmarshal(file, &data)
+	data = append(data, info)
+
+	reqBodyBytes2 := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes2).Encode(data)
+	ioutil.WriteFile(ManifestPath, reqBodyBytes2.Bytes(), 0644)
+
+}
+
+func removeIt(ss string, ssSlice []Info) []Info {
+	for idx, v := range ssSlice {
+		if v.ChunkName == ss {
+			return append(ssSlice[0:idx], ssSlice[idx+1:]...)
+		}
+	}
+	return ssSlice
+}
+
+func deleteKey(key string) {
+
+	if !CheckManifestExists() {
+		return
+	}
+	var nodeInfo = GetMenifest()
+
+	data := removeIt(key, nodeInfo)
+
+	reqBodyBytes2 := new(bytes.Buffer)
+	json.NewEncoder(reqBodyBytes2).Encode(data)
+	ioutil.WriteFile(ManifestPath, reqBodyBytes2.Bytes(), 0644)
+}
+
 func SaveFileInfo(dst int, key string, value int) {
 
 	manifest := fmt.Sprint(dst)
 
 	_, err := os.Stat(manifest)
 	if err != nil {
-		err = os.Mkdir(manifest, 0755)
-		if err != nil {
+		myfile, e := os.Create(manifest)
+		if e != nil {
 			fmt.Println("Error in creating dir")
-			// return nil, err
+
+			log.Fatal(e)
 		}
+		log.Println(myfile)
+		myfile.Close()
+		// err = os.Mkdir(manifest, 0755)
+		// if err != nil {
+		// 	fmt.Println("Error in creating dir")
+		// 	// return nil, err
+		// }
 	}
 
-	file, _ := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
+	file, _ := ioutil.ReadFile(ManifestPath)
 	// if err != nil {
 	// 	fmt.Print(" ", err)
 	// }
@@ -102,7 +211,7 @@ func SaveFileInfo(dst int, key string, value int) {
 
 		log.Fatal(errk)
 	}
-	ioutil.WriteFile(fmt.Sprint(dst)+"/output.json", newData, 0644)
+	ioutil.WriteFile(ManifestPath, newData, 0644)
 }
 
 // The map of stored files' names to their keys.
@@ -252,13 +361,13 @@ func handleRequest(conn net.Conn) {
 func handleRetrieveRequest(conn net.Conn, reader *bufio.Reader, request string) {
 	tokens := strings.Split(request, " ")
 	fileName := tokens[1]
-	add := tokens[2]
-	_, ok1 := GetStoredFile(hsh(add), fileName)
+	// add := tokens[2]
+	isExist := isChunkExist(fileName)
 
 	// _, ok := storedFiles[fileName]
 
 	// Could not find the file.
-	if ok1 == 0 {
+	if !isExist {
 		conn.Write([]byte("ERR File does not exist.\n"))
 		return
 	}
@@ -307,8 +416,13 @@ func handleStoreRequest(conn net.Conn, reader *bufio.Reader, request string) {
 		return
 	}
 	fileKey := hsh(fileName)
-	storedFiles[fileName] = fileKey // memory store
-	SaveFileInfo(self.ID, fileName, fileKey)
+	// storedFiles[fileName] = fileKey // memory store
+	chunkIndex := 1        // static
+	filename := "test.txt" //
+	chunkName := fileName
+	noOfChunks := 2        // static
+	ownerNodeId := self.ID // need to confirm later
+	insertData(chunkIndex, filename, chunkName, fileKey, noOfChunks, ownerNodeId)
 
 	conn.Write([]byte("OK\n"))
 }
@@ -411,9 +525,46 @@ func handleSuccessorRequest(conn net.Conn, reader *bufio.Reader, request string)
 	conn.Write([]byte(answer + "\n"))
 }
 
+func GetMenifest() []Info {
+	if !CheckManifestExists() {
+		return nil
+	}
+	jsonFile, err := os.Open(ManifestPath)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	var nodeInfo []Info
+	json.Unmarshal(byteValue, &nodeInfo)
+	return nodeInfo
+}
+
+func GetFileChunks(filename string, ownerNodeId int) map[string]int {
+	if !CheckManifestExists() {
+		return nil
+	}
+	var nodeInfo = GetMenifest()
+	chunkInfo := make(map[string]int, 0)
+
+	for i := 0; i < len(nodeInfo); i++ {
+		data := nodeInfo[i]
+		if data.Filename == filename {
+			// data := ChunkInfo{ChunkName: data.ChunkName, ChunkIndex: data.ChunkIndex}
+			chunkInfo[data.ChunkName] = data.FileKey
+			// chunkInfo = append(chunkInfo, data)
+		}
+	}
+	fmt.Println("chunkInfo are ", chunkInfo)
+
+	return chunkInfo
+}
+
 func GetManifest(dst int) map[string]int {
 
-	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
+	file, err := ioutil.ReadFile(ManifestPath)
 	if err != nil {
 		// log.Fatal(err)
 	}
@@ -428,20 +579,33 @@ func GetManifest(dst int) map[string]int {
 // that should be moved to the new node, moves them.
 func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 	// Acquire the list of files that need to be transferred to the new node.
+
+	if !CheckManifestExists() {
+		return
+	}
 	toTransfer := []string{}
-	for fileName, fileKey := range GetManifest(self.ID) {
-		if between(newNodeID, fileKey, self.ID) {
+
+	var nodeInfo = GetMenifest()
+	// keys := make([]int, 0)
+
+	for i := 0; i < len(nodeInfo); i++ {
+		data := nodeInfo[i]
+		if between(newNodeID, data.FileKey, self.ID) {
 			continue
 		}
-		toTransfer = append(toTransfer, fileName)
+		toTransfer = append(toTransfer, data.ChunkName)
+		// if data.Filename == filename {
+		// 	keys = append(keys, data.FileKey)
+		// }
 	}
-	for _, fileName := range toTransfer {
+
+	for _, chunkName := range toTransfer {
 		// Store the file in the new peer.
-		storeFile(fileName, newNodeAddr)
+		storeFile(chunkName, newNodeAddr)
 		// Remove the file from this peer.
-		os.Remove(filePath(fileName))
-		deleteKey(fileName, self.ID)
-		delete(storedFiles, fileName)
+		os.Remove(filePath(chunkName))
+		deleteKey(chunkName)
+		// delete(storedFiles, fileName)
 	}
 }
 
@@ -554,26 +718,6 @@ func joinRing(initiatorAddress string) {
 	predecessor.ID = hsh(predecessorAddr)
 }
 
-func deleteKey(key string, dst int) {
-
-	file, err := ioutil.ReadFile(fmt.Sprint(dst) + "/output.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var data map[string]int
-	err = json.Unmarshal(file, &data)
-
-	delete(data, key)
-	newData, errk := json.Marshal(data)
-	if errk != nil {
-		fmt.Print("Errk", errk)
-
-		log.Fatal(errk)
-	}
-	ioutil.WriteFile(fmt.Sprint(dst)+"/output.json", newData, 0644)
-}
-
 func leaveRing() {
 	// You can't leave a ring if there's no ring!
 	if successor.ID == -1 || predecessor.ID == -1 {
@@ -584,8 +728,14 @@ func leaveRing() {
 	// Update this node's predecessor's successor.
 	sendUpdateRequest(successor.Address, "KEEP", predecessor.Address)
 	// Transfer the files to the successor.
-	for fileName := range GetManifest(self.ID) {
-		storeFile(fileName, successor.Address)
+	if !CheckManifestExists() {
+		return
+	}
+	// toTransfer := []string{}
+
+	// var nodeInfo = GetMenifest()
+	for _, chunk := range GetMenifest() {
+		storeFile(chunk.ChunkName, successor.Address)
 	}
 	// Remove the peer directory.
 	os.RemoveAll(fmt.Sprintf("%d", self.ID))
@@ -642,13 +792,13 @@ func main() {
 			// Output the neighbor and self ids.
 			fmt.Printf("(%d, %d, %d)\n", predecessor.ID, self.ID, successor.ID)
 		case 5:
-			if len(GetManifest(self.ID)) < 1 {
-				fmt.Println("No files are stored!")
-			}
-			// Iterate through the storedFiles map and show each key, value pair.
-			for fileName, key := range GetManifest(self.ID) {
-				fmt.Println(fileName, "=>", key)
-			}
+			// if len(GetFileChunks(self.ID)) < 1 {
+			// 	fmt.Println("No files are stored!")
+			// }
+			// // Iterate through the storedFiles map and show each key, value pair.
+			// for fileName, key := range GetFileChunks(self.ID) {
+			// 	fmt.Println(fileName, "=>", key)
+			// }
 		case 6:
 			fmt.Println(self.Address)
 		case 7:
