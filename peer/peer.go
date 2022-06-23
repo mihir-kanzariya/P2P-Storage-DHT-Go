@@ -41,7 +41,6 @@ type Info struct {
 	NoOfChunks  int    `json:"NoOfChunks"`
 	ChunkIndex  int    `json:"ChunkIndex"`
 	OwnerNodeId int    `json:"OwnerNodeId"`
-	NodeId      int    `json:"NodeId"`
 }
 type ChunkInfo struct {
 	ChunkName  string `json:"ChunkName"`
@@ -104,11 +103,11 @@ func CheckManifestExists() bool {
 	return true
 }
 
-func insertData(chunkIndex int, filename string, chunkName string, fileKey int, noOfChunks int, ownerNodeId int, nodeId int) {
+func insertData(chunkIndex int, filename string, chunkName string, fileKey int, noOfChunks int, ownerNodeId int) {
 	if !CheckManifestExists() {
 		return
 	}
-	var info = Info{Filename: filename, ChunkIndex: chunkIndex, ChunkName: chunkName, FileKey: fileKey, NoOfChunks: noOfChunks, OwnerNodeId: ownerNodeId, NodeId: nodeId}
+	var info = Info{Filename: filename, ChunkIndex: chunkIndex, ChunkName: chunkName, FileKey: fileKey, NoOfChunks: noOfChunks, OwnerNodeId: ownerNodeId}
 
 	reqBodyBytes := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes).Encode(info)
@@ -286,6 +285,8 @@ func handleRequest(conn net.Conn) {
 		handleStoreRequest(conn, reader, request)
 	} else if strings.HasPrefix(request, "RETRIEVE") {
 		handleRetrieveRequest(conn, reader, request)
+	} else if strings.HasPrefix(request, "MOVE") {
+		handleMoveRequest(conn, reader, request)
 	}
 }
 
@@ -389,11 +390,50 @@ func handleStoreRequest(conn net.Conn, reader *bufio.Reader, request string) {
 		fileKey := hsh(name)
 		fmt.Println("file key is ", fileKey, nodeIds)
 		// chunkName := fileName
-		ownerNodeId := self.ID // need to confirm later
+		ownerNodeId := nodeIds // need to confirm later
 
-		insertData(index, fileName, name, fileKey, len(chunks), ownerNodeId, nodeIds)
+		insertData(index, fileName, name, fileKey, len(chunks), ownerNodeId)
 	}
 	os.Remove(dstFile.Name())
+
+	conn.Write([]byte("OK\n"))
+}
+
+// Handles a `MOVE` request (MOVE <file name> <file size>)
+// Downloads the file from the client and saves it into local storage.
+func handleMoveRequest(conn net.Conn, reader *bufio.Reader, request string) {
+	tokens := strings.Split(request, " ")
+	// Acquire the file name & size.
+
+	var chunk Info
+	json.Unmarshal([]byte(tokens[1]), &chunk)
+	fmt.Println("Operation:", chunk)
+	// var chunk Info = tokens[1]
+	fileSize, _ := strconv.Atoi(tokens[2])
+	// index, _ := strconv.Atoi(tokens[3])
+	// name := tokens[4]
+	// chunks := tokens[5]
+	// ownerNodeId, _ := strconv.Atoi(tokens[6])
+	// Create the file on the system.
+	dstFile, err := os.Create(filePath(chunk.ChunkName))
+	defer dstFile.Close()
+	if err != nil {
+		log.Println(err)
+		conn.Write([]byte("ERR Could not store file.\n"))
+		return
+	}
+	conn.Write([]byte("OK\n"))
+	// Get the file from the connection.
+	_, err = io.CopyN(dstFile, reader, int64(fileSize))
+	if err != nil {
+		log.Println(err)
+		conn.Write([]byte("ERR Could not copy file.\n"))
+		return
+	}
+	// fileKey := hsh(chunk.Filename)
+	// storedFiles[fileName] = fileKey // memory store
+	// SaveFileInfo(self.ID, fileName, fileKey)
+	insertData(chunk.ChunkIndex, chunk.Filename, chunk.ChunkName, chunk.FileKey, chunk.NoOfChunks, self.ID)
 
 	conn.Write([]byte("OK\n"))
 }
@@ -580,6 +620,40 @@ func moveFilesToNewNode(newNodeAddr string, newNodeID int) {
 }
 
 // Stores the given file to the given peer.
+func MoveFile(chunk Info, peerAddr string) {
+	conn, reader := connectToPeer(peerAddr)
+	defer conn.Close()
+	srcFile, err := os.Open(filePath(chunk.ChunkName))
+	defer srcFile.Close()
+	if err != nil {
+		log.Println("Could not send store request")
+		log.Fatalln(err)
+	}
+	fileInfo, _ := srcFile.Stat()
+	fileSize := fileInfo.Size()
+
+	stringChunk, err := json.Marshal(chunk)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// Send the store request.
+	storeRequest := fmt.Sprintf("MOVE %s %d\n", string(stringChunk), fileSize)
+	conn.Write([]byte(storeRequest))
+	// Read the response.
+	serverResponse, _ := reader.ReadString('\n')
+	respType, respMsg := extractServerResponse(serverResponse)
+	// Response: ERR <error msg>
+	if respType != "OK" {
+		fmt.Println(respType, respMsg)
+		return
+	}
+	// Response: OK
+	io.Copy(conn, srcFile)
+	// No error checking for now...
+}
+
+// Stores the given file to the given peer.
 func storeFile(fileName string, peerAddr string) {
 	conn, reader := connectToPeer(peerAddr)
 	defer conn.Close()
@@ -705,7 +779,10 @@ func leaveRing() {
 
 	// var nodeInfo = GetMenifest()
 	for _, chunk := range GetMenifest() {
-		storeFile(chunk.ChunkName, successor.Address)
+		if chunk.OwnerNodeId == self.ID {
+			deleteKey(chunk.ChunkName)
+			MoveFile(chunk, successor.Address)
+		}
 	}
 	// Remove the peer directory.
 	os.RemoveAll(fmt.Sprintf("%d", self.ID))
