@@ -33,6 +33,11 @@ func newNode() node {
 	}
 }
 
+// range specification, note that min <= max
+type IntRange struct {
+	min, max int
+}
+
 type Info struct {
 	Filename    string `json:"Filename"`
 	ChunkName   string `json:"ChunkName"`
@@ -322,13 +327,27 @@ func handleRetrieveRequest(conn net.Conn, reader *bufio.Reader, request string) 
 	conn.Write([]byte("OK\n"))
 }
 
+// get next random value within the interval including min and max
+func (ir *IntRange) NextRandom(r *rann.Rand) int {
+	return r.Intn(ir.max-ir.min+1) + ir.min
+}
 func getNodeId(index int) int {
 	id := self.ID
-	if index > 0 {
+	if index == 0 {
+		return id
+	} else if index == 1 {
 		if successor.ID != -1 {
-			id = successor.ID
-		} else if predecessor.ID != -1 {
-			id = predecessor.ID
+			return successor.ID
+		}
+	} else if index == 2 {
+		if predecessor.ID != -1 {
+			return predecessor.ID
+		}
+	} else {
+		if successor.ID != -1 && predecessor.ID != -1 {
+			r := rann.New(rann.NewSource(100))
+			ir := IntRange{1, 3} // because its ring based and 3 nodes would be here
+			return ir.NextRandom(r)
 		}
 	}
 	return id
