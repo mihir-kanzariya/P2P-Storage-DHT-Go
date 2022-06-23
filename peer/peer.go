@@ -45,6 +45,7 @@ type Info struct {
 	NoOfChunks  int    `json:"NoOfChunks"`
 	ChunkIndex  int    `json:"ChunkIndex"`
 	OwnerNodeId int    `json:"OwnerNodeId"`
+	NodeId      int    `json:"NodeId"`
 }
 type ChunkInfo struct {
 	ChunkName  string `json:"ChunkName"`
@@ -107,12 +108,11 @@ func CheckManifestExists() bool {
 	return true
 }
 
-func insertData(chunkIndex int, filename string, chunkName string, fileKey int, noOfChunks int, ownerNodeId int) {
-	fmt.Println("here")
+func insertData(chunkIndex int, filename string, chunkName string, fileKey int, noOfChunks int, ownerNodeId int, nodeId int) {
 	if !CheckManifestExists() {
 		return
 	}
-	var info = Info{Filename: filename, ChunkIndex: chunkIndex, ChunkName: chunkName, FileKey: fileKey, NoOfChunks: noOfChunks, OwnerNodeId: ownerNodeId}
+	var info = Info{Filename: filename, ChunkIndex: chunkIndex, ChunkName: chunkName, FileKey: fileKey, NoOfChunks: noOfChunks, OwnerNodeId: ownerNodeId, NodeId: nodeId}
 
 	reqBodyBytes := new(bytes.Buffer)
 	json.NewEncoder(reqBodyBytes).Encode(info)
@@ -394,7 +394,7 @@ func handleStoreRequest(conn net.Conn, reader *bufio.Reader, request string) {
 		// chunkName := fileName
 		ownerNodeId := self.ID // need to confirm later
 
-		insertData(index, fileName, name, fileKey, len(chunks), ownerNodeId)
+		insertData(index, fileName, name, fileKey, len(chunks), ownerNodeId, nodeIds)
 	}
 	os.Remove(dstFile.Name())
 
