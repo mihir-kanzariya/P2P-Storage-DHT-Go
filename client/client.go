@@ -172,7 +172,7 @@ func saveFile(fileName string, peerAddr string) {
 	for index, chunk := range chunks {
 
 		fileExtension := filepath.Ext(fileName)
-		name := "chunk-" + strconv.Itoa(rann.Int()) + strconv.Itoa(index) + fileExtension
+		name := fileName + "-chunk-" + strconv.Itoa(rann.Int()) + strconv.Itoa(index) + fileExtension
 		tempFile, err := os.Create(name)
 		if err != nil {
 			log.Fatal(err)

@@ -1,0 +1,26 @@
+[
+    {
+        "Filename": "test.txt",
+        "ChunkName": "test.txt-chunk-55770067919477794100.txt",
+        "FileKey": 24,
+        "NoOfChunks": 5,
+        "ChunkIndex": 1,
+        "OwnerNodeId": 68
+    },
+    {
+        "Filename": "test.txt",
+        "ChunkName": "test.txt-chunk-35770067919477794100.txt",
+        "FileKey": 117,
+        "NoOfChunks": 5,
+        "ChunkIndex": 2,
+        "OwnerNodeId": 68
+    },
+    {
+        "Filename": "test.txt",
+        "ChunkName": "chunk-2dsdsd",
+        "FileKey": 25,
+        "NoOfChunks": 5,
+        "ChunkIndex": 3,
+        "OwnerNodeId": 68
+    }
+]
